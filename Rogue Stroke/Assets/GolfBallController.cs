@@ -6,27 +6,33 @@ using UnityEngine;
 public class GolfBallController : MonoBehaviour
 {
     [Header("Shot Settings")]
-    public float maxForce = 15f;
-    public float maxDragDistance = 3f;
     public int maxBounces = 5;
-    public float pathFollowSpeed = 10f;
+    public float pathFollowSpeed = 1.5f;
     public float pathMaxDistance = 20f;
 
     [Header("Aiming Line")]
     public LineRenderer aimLine;
     public float aimLineYOffset = 0.05f;
+    [Range(0f, 1f)] public float aimLineVisiblePercent = 1f;
+    public Color minPowerColor = Color.white;
+    public Color maxPowerColor = Color.red;
 
     [Header("Collision Settings")]
     public LayerMask collisionMask;
 
-    [Header("Aiming Line Visibility")]
-    [Range(0f, 1f)]
-    public float aimLineVisiblePercent = 1f; // 0 = hidden, 1 = full path shown
+    [Header("Stop Settings")]
+    public float glideSpeed = 2f;
+    public float stopThreshold = 0.1f;
+    public float linearDamping = 1.5f;
+    public float requiredLowSpeedDuration = 0.2f;
+
+    [Header("Hole Detection")]
+    public float holeSnapDistance = 0.5f;
+    public string holeTag = "Hole";
 
     private Rigidbody rb;
     private bool isDragging = false;
     private Vector2 dragStartScreen;
-    private Vector3 dragWorldTarget;
     private List<Vector3> bouncePath = new List<Vector3>();
     private bool isMoving = false;
 
@@ -34,7 +40,7 @@ public class GolfBallController : MonoBehaviour
     {
         rb = GetComponent<Rigidbody>();
         rb.useGravity = true;
-        rb.linearDamping = 0.3f;
+        rb.linearDamping = linearDamping;
         rb.angularDamping = 0.05f;
 
         if (aimLine != null)
@@ -59,16 +65,15 @@ public class GolfBallController : MonoBehaviour
             Vector2 dragDelta = dragCurrent - dragStartScreen;
 
             Vector3 pullDir = new Vector3(dragDelta.x, 0, dragDelta.y).normalized;
-            float pullStrength = Mathf.Min(dragDelta.magnitude * 0.01f, maxDragDistance);
-            Vector3 pullVector = pullDir * pullStrength;
+            float dragMagnitude = Mathf.Pow(dragDelta.magnitude, 0.85f) * 0.01f;
+            float pathLength = Mathf.Clamp(dragMagnitude, 0f, pathMaxDistance);
 
-            dragWorldTarget = transform.position + pullVector;
+            bouncePath = GenerateBouncePath(transform.position, pullDir, pathLength);
 
-            Vector3 shotDir = (dragWorldTarget - transform.position).normalized;
-            float shotPower = Mathf.Min(Vector3.Distance(transform.position, dragWorldTarget), maxDragDistance);
-
-            float totalPathLength = shotPower * maxForce;
-            bouncePath = GenerateBouncePath(transform.position, shotDir, totalPathLength);
+            float powerPercent = Mathf.Clamp01(pathLength / pathMaxDistance);
+            Color currentColor = Color.Lerp(minPowerColor, maxPowerColor, powerPercent);
+            aimLine.startColor = currentColor;
+            aimLine.endColor = currentColor;
 
             DrawLine(bouncePath);
         }
@@ -84,9 +89,7 @@ public class GolfBallController : MonoBehaviour
 
     List<Vector3> GenerateBouncePath(Vector3 startPos, Vector3 direction, float totalDistance)
     {
-        List<Vector3> points = new List<Vector3>();
-        points.Add(startPos);
-
+        List<Vector3> points = new List<Vector3> { startPos };
         Vector3 currentPos = startPos;
         Vector3 currentDir = direction;
         float remainingDistance = Mathf.Min(totalDistance, pathMaxDistance);
@@ -96,7 +99,6 @@ public class GolfBallController : MonoBehaviour
             if (Physics.Raycast(currentPos, currentDir, out RaycastHit hit, remainingDistance, collisionMask))
             {
                 points.Add(hit.point);
-
                 float traveled = Vector3.Distance(currentPos, hit.point);
                 remainingDistance -= traveled;
                 currentPos = hit.point;
@@ -129,8 +131,7 @@ public class GolfBallController : MonoBehaviour
         float totalLength = CalculatePathLength(fullPath);
         float visibleLength = totalLength * Mathf.Clamp01(aimLineVisiblePercent);
 
-        List<Vector3> visiblePoints = new List<Vector3>();
-        visiblePoints.Add(fullPath[0]);
+        List<Vector3> visiblePoints = new List<Vector3> { fullPath[0] };
         float accumulated = 0f;
 
         for (int i = 1; i < fullPath.Count; i++)
@@ -163,10 +164,13 @@ public class GolfBallController : MonoBehaviour
         isMoving = true;
         rb.isKinematic = true;
 
+        Vector3 finalDir = Vector3.zero;
+
         for (int i = 0; i < path.Count - 1; i++)
         {
             Vector3 start = path[i];
             Vector3 end = path[i + 1];
+            Vector3 direction = (end - start).normalized;
             float distance = Vector3.Distance(start, end);
             float duration = distance / speed;
 
@@ -177,12 +181,88 @@ public class GolfBallController : MonoBehaviour
                 transform.position = Vector3.Lerp(start, end, t);
                 yield return null;
             }
+
+            finalDir = direction;
+        }
+
+        GameObject nearestHole = FindNearestHole(transform.position);
+        if (nearestHole && Vector3.Distance(transform.position, nearestHole.transform.position) <= holeSnapDistance)
+        {
+            yield return StartCoroutine(MoveToHole(nearestHole.transform.position));
+            yield break;
         }
 
         rb.isKinematic = false;
+        rb.linearDamping = linearDamping;
+        rb.linearVelocity = finalDir * glideSpeed;
+
+        float lowSpeedTime = 0f;
+        while (true)
+        {
+            if (rb.linearVelocity.magnitude < stopThreshold)
+            {
+                lowSpeedTime += Time.deltaTime;
+                if (lowSpeedTime >= requiredLowSpeedDuration)
+                {
+                    rb.linearVelocity = Vector3.zero;
+                    break;
+                }
+            }
+            else
+            {
+                lowSpeedTime = 0f;
+            }
+            yield return null;
+        }
+
         isMoving = false;
     }
+
+    GameObject FindNearestHole(Vector3 position)
+    {
+        GameObject[] holes = GameObject.FindGameObjectsWithTag(holeTag);
+        GameObject closest = null;
+        float closestDist = Mathf.Infinity;
+
+        foreach (GameObject hole in holes)
+        {
+            float dist = Vector3.Distance(position, hole.transform.position);
+            if (dist < closestDist)
+            {
+                closestDist = dist;
+                closest = hole;
+            }
+        }
+
+        return closest;
+    }
+
+    IEnumerator MoveToHole(Vector3 holePosition)
+    {
+        Vector3 dropTarget = holePosition - Vector3.up * 0.1f;
+        float dropDuration = 0.3f;
+        Vector3 startPos = transform.position;
+
+        float t = 0f;
+        while (t < 1f)
+        {
+            t += Time.deltaTime / dropDuration;
+            transform.position = Vector3.Lerp(startPos, dropTarget, t);
+            yield return null;
+        }
+
+        rb.isKinematic = true;
+        rb.linearVelocity = Vector3.zero;
+        rb.detectCollisions = false;
+        isMoving = false;
+        Debug.Log("Ball dropped into hole.");
+    }
 }
+
+
+
+
+
 
 
 
