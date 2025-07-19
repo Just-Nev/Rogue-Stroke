@@ -10,7 +10,7 @@ public class GolfBallController : MonoBehaviour
     public float maxDragDistance = 3f;
     public int maxBounces = 5;
     public float pathFollowSpeed = 10f;
-    public float pathMaxDistance = 20f; //total path distance allowed (adjustable)
+    public float pathMaxDistance = 20f;
 
     [Header("Aiming Line")]
     public LineRenderer aimLine;
@@ -18,6 +18,10 @@ public class GolfBallController : MonoBehaviour
 
     [Header("Collision Settings")]
     public LayerMask collisionMask;
+
+    [Header("Aiming Line Visibility")]
+    [Range(0f, 1f)]
+    public float aimLineVisiblePercent = 1f; // 0 = hidden, 1 = full path shown
 
     private Rigidbody rb;
     private bool isDragging = false;
@@ -85,7 +89,7 @@ public class GolfBallController : MonoBehaviour
 
         Vector3 currentPos = startPos;
         Vector3 currentDir = direction;
-        float remainingDistance = Mathf.Min(totalDistance, pathMaxDistance); // cap path distance
+        float remainingDistance = Mathf.Min(totalDistance, pathMaxDistance);
 
         for (int i = 0; i < maxBounces && remainingDistance > 0f; i++)
         {
@@ -108,16 +112,49 @@ public class GolfBallController : MonoBehaviour
         return points;
     }
 
-    void DrawLine(List<Vector3> points)
+    float CalculatePathLength(List<Vector3> path)
     {
-        if (aimLine == null || points.Count < 2) return;
+        float length = 0f;
+        for (int i = 0; i < path.Count - 1; i++)
+        {
+            length += Vector3.Distance(path[i], path[i + 1]);
+        }
+        return length;
+    }
+
+    void DrawLine(List<Vector3> fullPath)
+    {
+        if (aimLine == null || fullPath.Count < 2) return;
+
+        float totalLength = CalculatePathLength(fullPath);
+        float visibleLength = totalLength * Mathf.Clamp01(aimLineVisiblePercent);
+
+        List<Vector3> visiblePoints = new List<Vector3>();
+        visiblePoints.Add(fullPath[0]);
+        float accumulated = 0f;
+
+        for (int i = 1; i < fullPath.Count; i++)
+        {
+            float segmentLength = Vector3.Distance(fullPath[i - 1], fullPath[i]);
+
+            if (accumulated + segmentLength > visibleLength)
+            {
+                float remaining = visibleLength - accumulated;
+                Vector3 dir = (fullPath[i] - fullPath[i - 1]).normalized;
+                Vector3 partialPoint = fullPath[i - 1] + dir * remaining;
+                visiblePoints.Add(partialPoint);
+                break;
+            }
+
+            visiblePoints.Add(fullPath[i]);
+            accumulated += segmentLength;
+        }
 
         aimLine.enabled = true;
-        aimLine.positionCount = points.Count;
-
-        for (int i = 0; i < points.Count; i++)
+        aimLine.positionCount = visiblePoints.Count;
+        for (int i = 0; i < visiblePoints.Count; i++)
         {
-            aimLine.SetPosition(i, points[i] + Vector3.up * aimLineYOffset);
+            aimLine.SetPosition(i, visiblePoints[i] + Vector3.up * aimLineYOffset);
         }
     }
 
@@ -146,6 +183,7 @@ public class GolfBallController : MonoBehaviour
         isMoving = false;
     }
 }
+
 
 
 
