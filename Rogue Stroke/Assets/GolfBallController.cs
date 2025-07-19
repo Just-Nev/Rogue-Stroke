@@ -26,14 +26,21 @@ public class GolfBallController : MonoBehaviour
     public float linearDamping = 1.5f;
     public float requiredLowSpeedDuration = 0.2f;
 
-    [Header("Hole Detection")]
-    public float holeSnapDistance = 0.5f;
-    public string holeTag = "Hole";
+    [Header("Shot Counter")]
+    public int shotCount = 0;
+    public GameObject spriteLevel1;
+    public GameObject spriteLevel2;
+    public GameObject spriteLevel3;
+
+    [Header("Audio")]
+    public AudioSource audioSource;
+    public AudioClip shotSound;
+    public AudioClip bounceSound;
 
     private Rigidbody rb;
     private bool isDragging = false;
     private Vector2 dragStartScreen;
-    private List<Vector3> bouncePath = new List<Vector3>();
+    private List<Vector3> bouncePath = new();
     private bool isMoving = false;
 
     void Start()
@@ -48,6 +55,10 @@ public class GolfBallController : MonoBehaviour
             aimLine.positionCount = 0;
             aimLine.enabled = false;
         }
+
+        if (spriteLevel1 != null) spriteLevel1.SetActive(true);
+        if (spriteLevel2 != null) spriteLevel2.SetActive(false);
+        if (spriteLevel3 != null) spriteLevel3.SetActive(false);
     }
 
     void Update()
@@ -61,9 +72,7 @@ public class GolfBallController : MonoBehaviour
         }
         else if (Input.GetMouseButton(0) && isDragging)
         {
-            Vector2 dragCurrent = Input.mousePosition;
-            Vector2 dragDelta = dragCurrent - dragStartScreen;
-
+            Vector2 dragDelta = (Vector2)Input.mousePosition - dragStartScreen;
             Vector3 pullDir = new Vector3(dragDelta.x, 0, dragDelta.y).normalized;
             float dragMagnitude = Mathf.Pow(dragDelta.magnitude, 0.85f) * 0.01f;
             float pathLength = Mathf.Clamp(dragMagnitude, 0f, pathMaxDistance);
@@ -83,13 +92,32 @@ public class GolfBallController : MonoBehaviour
             if (aimLine != null) aimLine.enabled = false;
 
             if (bouncePath.Count > 1)
+            {
+                shotCount++;
+                UpdateShotSprites();
+
+                if (audioSource && shotSound)
+                    audioSource.PlayOneShot(shotSound);
+
                 StartCoroutine(FollowPath(bouncePath, pathFollowSpeed));
+            }
         }
+    }
+
+    void UpdateShotSprites()
+    {
+        if (spriteLevel1 != null) spriteLevel1.SetActive(false);
+        if (spriteLevel2 != null) spriteLevel2.SetActive(false);
+        if (spriteLevel3 != null) spriteLevel3.SetActive(false);
+
+        if (shotCount < 3 && spriteLevel1 != null) spriteLevel1.SetActive(true);
+        else if (shotCount < 5 && spriteLevel2 != null) spriteLevel2.SetActive(true);
+        else if (spriteLevel3 != null) spriteLevel3.SetActive(true);
     }
 
     List<Vector3> GenerateBouncePath(Vector3 startPos, Vector3 direction, float totalDistance)
     {
-        List<Vector3> points = new List<Vector3> { startPos };
+        List<Vector3> points = new() { startPos };
         Vector3 currentPos = startPos;
         Vector3 currentDir = direction;
         float remainingDistance = Mathf.Min(totalDistance, pathMaxDistance);
@@ -103,6 +131,9 @@ public class GolfBallController : MonoBehaviour
                 remainingDistance -= traveled;
                 currentPos = hit.point;
                 currentDir = Vector3.Reflect(currentDir, hit.normal);
+
+                if (isMoving && audioSource && bounceSound && traveled > 0.5f)
+                    audioSource.PlayOneShot(bounceSound);
             }
             else
             {
@@ -114,41 +145,31 @@ public class GolfBallController : MonoBehaviour
         return points;
     }
 
-    float CalculatePathLength(List<Vector3> path)
-    {
-        float length = 0f;
-        for (int i = 0; i < path.Count - 1; i++)
-        {
-            length += Vector3.Distance(path[i], path[i + 1]);
-        }
-        return length;
-    }
-
     void DrawLine(List<Vector3> fullPath)
     {
         if (aimLine == null || fullPath.Count < 2) return;
 
-        float totalLength = CalculatePathLength(fullPath);
-        float visibleLength = totalLength * Mathf.Clamp01(aimLineVisiblePercent);
+        float totalLength = 0f;
+        for (int i = 1; i < fullPath.Count; i++)
+            totalLength += Vector3.Distance(fullPath[i - 1], fullPath[i]);
 
-        List<Vector3> visiblePoints = new List<Vector3> { fullPath[0] };
+        float visibleLength = totalLength * Mathf.Clamp01(aimLineVisiblePercent);
         float accumulated = 0f;
+        List<Vector3> visiblePoints = new() { fullPath[0] };
 
         for (int i = 1; i < fullPath.Count; i++)
         {
-            float segmentLength = Vector3.Distance(fullPath[i - 1], fullPath[i]);
-
-            if (accumulated + segmentLength > visibleLength)
+            float segment = Vector3.Distance(fullPath[i - 1], fullPath[i]);
+            if (accumulated + segment > visibleLength)
             {
                 float remaining = visibleLength - accumulated;
                 Vector3 dir = (fullPath[i] - fullPath[i - 1]).normalized;
-                Vector3 partialPoint = fullPath[i - 1] + dir * remaining;
-                visiblePoints.Add(partialPoint);
+                visiblePoints.Add(fullPath[i - 1] + dir * remaining);
                 break;
             }
 
             visiblePoints.Add(fullPath[i]);
-            accumulated += segmentLength;
+            accumulated += segment;
         }
 
         aimLine.enabled = true;
@@ -165,6 +186,7 @@ public class GolfBallController : MonoBehaviour
         rb.isKinematic = true;
 
         Vector3 finalDir = Vector3.zero;
+        Vector3 lastDirection = Vector3.zero;
 
         for (int i = 0; i < path.Count - 1; i++)
         {
@@ -173,6 +195,11 @@ public class GolfBallController : MonoBehaviour
             Vector3 direction = (end - start).normalized;
             float distance = Vector3.Distance(start, end);
             float duration = distance / speed;
+
+            if (i > 0 && Vector3.Angle(lastDirection, direction) > 10f && audioSource && bounceSound)
+                audioSource.PlayOneShot(bounceSound);
+
+            lastDirection = direction;
 
             float t = 0f;
             while (t < 1f)
@@ -183,13 +210,6 @@ public class GolfBallController : MonoBehaviour
             }
 
             finalDir = direction;
-        }
-
-        GameObject nearestHole = FindNearestHole(transform.position);
-        if (nearestHole && Vector3.Distance(transform.position, nearestHole.transform.position) <= holeSnapDistance)
-        {
-            yield return StartCoroutine(MoveToHole(nearestHole.transform.position));
-            yield break;
         }
 
         rb.isKinematic = false;
@@ -217,64 +237,7 @@ public class GolfBallController : MonoBehaviour
 
         isMoving = false;
     }
-
-    GameObject FindNearestHole(Vector3 position)
-    {
-        GameObject[] holes = GameObject.FindGameObjectsWithTag(holeTag);
-        GameObject closest = null;
-        float closestDist = Mathf.Infinity;
-
-        foreach (GameObject hole in holes)
-        {
-            float dist = Vector3.Distance(position, hole.transform.position);
-            if (dist < closestDist)
-            {
-                closestDist = dist;
-                closest = hole;
-            }
-        }
-
-        return closest;
-    }
-
-    IEnumerator MoveToHole(Vector3 holePosition)
-    {
-        Vector3 dropTarget = holePosition - Vector3.up * 0.1f;
-        float dropDuration = 0.3f;
-        Vector3 startPos = transform.position;
-
-        float t = 0f;
-        while (t < 1f)
-        {
-            t += Time.deltaTime / dropDuration;
-            transform.position = Vector3.Lerp(startPos, dropTarget, t);
-            yield return null;
-        }
-
-        rb.isKinematic = true;
-        rb.linearVelocity = Vector3.zero;
-        rb.detectCollisions = false;
-        isMoving = false;
-        Debug.Log("Ball dropped into hole.");
-    }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
