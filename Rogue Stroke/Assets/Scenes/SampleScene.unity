@@ -1142,7 +1142,11 @@ MonoBehaviour:
   - {x: -500, y: -12}
   - {x: 0, y: -12}
   - {x: 500, y: -12}
+  scaleUpDuration: 0.6
   activeCards: []
+  shakeDuration: 2
+  shakeSpeed: 40
+  shakeAmount: 15
 --- !u!4 &342871046
 Transform:
   m_ObjectHideFlags: 0

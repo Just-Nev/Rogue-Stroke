@@ -1,131 +1,204 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class CardClickManager : MonoBehaviour
 {
-    public List<RectTransform> allCardPrefabs;
-    public Transform cardParent;
-    public Vector2[] targetPositions = new Vector2[3]
-    {
-        new Vector2(-32f, -12f),
-        new Vector2(417f, -12f),
-        new Vector2(417f, -12f)
-    };
+    [Header("Card Settings")]
+    public RectTransform[] allCardPrefabs;
+    public RectTransform cardParent;
+    public Vector2[] targetPositions;
+    public float scaleUpDuration = 0.6f; // Slower animation
 
-    public List<RectTransform> activeCards = new();
+    [Header("Runtime Data")]
+    public List<RectTransform> activeCards = new List<RectTransform>();
+
+    [Header("Shake Settings")]
+    public float shakeDuration = 0.3f;
+    public float shakeSpeed = 40f;
+    public float shakeAmount = 10f;
+
+    private bool cardAlreadyChosen = false;
 
     public void ShowRandomCards()
     {
-        ClearPreviousCards();
+        ClearCards();
+        cardAlreadyChosen = false;
 
-        List<int> selectedIndices = GetThreeRandomCardIndices();
-
-        for (int i = 0; i < selectedIndices.Count; i++)
+        if (allCardPrefabs.Length < 3)
         {
-            RectTransform card = Instantiate(allCardPrefabs[selectedIndices[i]], cardParent);
+            Debug.LogWarning("Not enough card prefabs.");
+            return;
+        }
+
+        List<int> indices = new List<int>();
+        for (int i = 0; i < allCardPrefabs.Length; i++) indices.Add(i);
+
+        for (int i = 0; i < 3; i++)
+        {
+            int rand = Random.Range(0, indices.Count);
+            RectTransform prefab = allCardPrefabs[indices[rand]];
+            indices.RemoveAt(rand);
+
+            RectTransform card = Instantiate(prefab, cardParent);
             card.anchoredPosition = targetPositions[i];
             card.localScale = Vector3.zero;
 
-            var cardComponent = card.GetComponent<BoonCardClick>();
-            cardComponent.Initialize(selectedIndices[i], this);
+            // Set up click info
+            BoonCardClick clickScript = card.GetComponent<BoonCardClick>();
+            if (clickScript == null) clickScript = card.gameObject.AddComponent<BoonCardClick>();
+            clickScript.cardID = rand;
+            clickScript.manager = this;
 
-            StartCoroutine(ScaleIn(card));
             activeCards.Add(card);
+            StartCoroutine(ScaleCardUp(card));
         }
     }
 
-    public void OnCardSelected(int cardID, RectTransform selectedCard)
+    public void OnCardClicked(int id)
     {
-        Debug.Log("Selected card ID: " + cardID);
-        StartCoroutine(HandleCardSelectionFeedback(selectedCard));
-    }
+        if (cardAlreadyChosen) return;
+        cardAlreadyChosen = true;
 
-    IEnumerator HandleCardSelectionFeedback(RectTransform selectedCard)
-    {
-        yield return StartCoroutine(ShakeCard(selectedCard, 0.3f, 10f));
+        Debug.Log($"Card with ID {id} clicked!");
 
+        //Apply boon effect (your switch statement)
+        switch (id)
+        {
+            case 0:
+                Debug.Log("Speed Boost selected!");
+                break;
+            case 1:
+                Debug.Log("Extra Shot selected!");
+                break;
+            case 2:
+                Debug.Log("Teleport selected!");
+                break;
+            case 3:
+                Debug.Log("Batman");
+                break;
+            case 4:
+                Debug.Log("Picard");
+                break;
+            case 5:
+                Debug.Log("Riker");
+                break;
+            default:
+                Debug.LogWarning("Unhandled card ID: " + id);
+                break;
+        }
+
+        //Find the clicked card from the active list
+        RectTransform selectedCard = null;
         foreach (var card in activeCards)
         {
-            StartCoroutine(ShrinkCard(card, 0.3f));
+            BoonCardClick click = card.GetComponent<BoonCardClick>();
+            if (click != null && click.cardID == id)
+            {
+                selectedCard = card;
+                break;
+            }
         }
 
-        yield return new WaitForSeconds(0.35f);
+        if (selectedCard == null)
+        {
+            Debug.LogError("Selected card not found in activeCards.");
+            return;
+        }
 
+        //Animate the selected card (shake, center, shrink)
+        StartCoroutine(AnimateSelectedCard(selectedCard));
+
+        //Shrink other cards
         foreach (var card in activeCards)
         {
-            if (card != null)
-                card.gameObject.SetActive(false);
+            if (card != selectedCard)
+                StartCoroutine(ShrinkAndDisable(card));
         }
 
-        activeCards.Clear();
+        //Optional cleanup
+        StartCoroutine(ClearActiveCardsAfterDelay(1f));
     }
 
-    List<int> GetThreeRandomCardIndices()
+    IEnumerator AnimateSelectedCard(RectTransform card)
     {
-        List<int> pool = new List<int>();
-        for (int i = 0; i < allCardPrefabs.Count; i++)
-            pool.Add(i);
-
-        List<int> selected = new List<int>();
-        for (int i = 0; i < 3 && pool.Count > 0; i++)
-        {
-            int index = Random.Range(0, pool.Count);
-            selected.Add(pool[index]);
-            pool.RemoveAt(index);
-        }
-        return selected;
-    }
-
-    void ClearPreviousCards()
-    {
-        foreach (var card in activeCards)
-        {
-            if (card != null)
-                Destroy(card.gameObject);
-        }
-        activeCards.Clear();
-    }
-
-    IEnumerator ScaleIn(RectTransform card)
-    {
-        float t = 0f;
-        float duration = 0.3f;
-        while (t < 1f)
-        {
-            t += Time.deltaTime / duration;
-            card.localScale = Vector3.Lerp(Vector3.zero, Vector3.one, t);
-            yield return null;
-        }
-        card.localScale = Vector3.one;
-    }
-
-    IEnumerator ShrinkCard(RectTransform card, float duration)
-    {
-        Vector3 start = card.localScale;
-        Vector3 end = Vector3.zero;
-        float t = 0f;
-        while (t < 1f)
-        {
-            t += Time.deltaTime / duration;
-            card.localScale = Vector3.Lerp(start, end, t);
-            yield return null;
-        }
-        card.localScale = end;
-    }
-
-    IEnumerator ShakeCard(RectTransform card, float duration, float magnitude)
-    {
-        Vector3 originalPos = card.anchoredPosition;
+        Vector2 originalPos = card.anchoredPosition;
         float elapsed = 0f;
-        while (elapsed < duration)
+
+        while (elapsed < shakeDuration)
         {
-            float offsetX = Random.Range(-1f, 1f) * magnitude;
-            float offsetY = Random.Range(-1f, 1f) * magnitude;
-            card.anchoredPosition = originalPos + new Vector3(offsetX, offsetY);
+            float offsetX = Mathf.Sin(elapsed * shakeSpeed) * shakeAmount;
+            card.anchoredPosition = originalPos + new Vector2(offsetX, 0f);
             elapsed += Time.deltaTime;
             yield return null;
         }
+
         card.anchoredPosition = originalPos;
+
+        // Shrink the selected card after shake
+        yield return StartCoroutine(ShrinkAndDisable(card));
+    }
+
+    IEnumerator ShrinkAndDisable(RectTransform card)
+    {
+        float shrinkTime = 0.3f;
+        Vector3 start = card.localScale;
+        Vector3 end = Vector3.zero;
+        float t = 0f;
+
+        while (t < 1f)
+        {
+            t += Time.deltaTime / shrinkTime;
+            card.localScale = Vector3.Lerp(start, end, t);
+            yield return null;
+        }
+
+        card.localScale = Vector3.zero;
+        card.gameObject.SetActive(false);
+    }
+
+    IEnumerator ClearActiveCardsAfterDelay(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        activeCards.Clear();
+    }
+
+
+    IEnumerator ScaleCardUp(RectTransform card)
+    {
+        float t = 0f;
+        Vector3 targetScale = Vector3.one;
+
+        while (t < 1f)
+        {
+            t += Time.deltaTime / scaleUpDuration;
+            card.localScale = Vector3.Lerp(Vector3.zero, targetScale, t);
+            yield return null;
+        }
+
+        card.localScale = targetScale;
+    }
+
+    IEnumerator HideAllCards()
+    {
+        yield return new WaitForSeconds(0.5f); // Optional delay before disappearing
+
+        foreach (var card in activeCards)
+        {
+            Destroy(card.gameObject);
+        }
+
+        activeCards.Clear();
+    }
+
+    public void ClearCards()
+    {
+        foreach (var card in activeCards)
+        {
+            if (card != null) Destroy(card.gameObject);
+        }
+        activeCards.Clear();
     }
 }
+
