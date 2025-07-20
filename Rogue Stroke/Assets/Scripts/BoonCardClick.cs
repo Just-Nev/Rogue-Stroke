@@ -4,13 +4,16 @@ using UnityEngine;
 public class BoonCardClick : MonoBehaviour, IPointerClickHandler
 {
     public int cardID;
-    public GolfHole hole;
+    private CardClickManager manager;
+
+    public void Initialize(int id, CardClickManager mgr)
+    {
+        cardID = id;
+        manager = mgr;
+    }
 
     public void OnPointerClick(PointerEventData eventData)
     {
-        if (hole != null)
-        {
-            hole.HideAllCardsAndMarkUsed(cardID);
-        }
+        manager.OnCardSelected(cardID, transform as RectTransform);
     }
 }
