@@ -91,6 +91,13 @@ public class CardClickManager : MonoBehaviour
 
         Debug.Log($"Card with ID {id} clicked!");
 
+        //Save to run data
+        if (RunData.Instance != null)
+        {
+            RunData.Instance.selectedCardIDs.Add(id);
+            Debug.Log($"Saved Card ID {id} to RunData.");
+        }
+
         // Apply effect based on ID
         switch (id)
         {
