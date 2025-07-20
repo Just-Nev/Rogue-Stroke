@@ -10,9 +10,11 @@ public class GolfBallController : MonoBehaviour
     public float pathFollowSpeed = 1.5f;
     public float pathMaxDistance = 20f;
 
-    [Header("Precision Settings")]
-    public float precisionPowerMultiplier = 0.2f;
-    public Color precisionColor = Color.cyan;
+    [Header("Power Settings")]
+    public float baseDragScale = 0.02f;
+    public float powerShotMultiplier = 1.0f;
+    public float precisionShotMultiplier = 0.3f;
+    public float tapShotMultiplier = 0.1f;
 
     [Header("Aiming Line")]
     public LineRenderer aimLine;
@@ -46,7 +48,7 @@ public class GolfBallController : MonoBehaviour
     private Vector2 dragStartScreen;
     private List<Vector3> bouncePath = new();
     private bool isMoving = false;
-    private bool isPrecisionShot = false;
+    private float currentPowerMultiplier = 1f;
 
     void Start()
     {
@@ -61,45 +63,41 @@ public class GolfBallController : MonoBehaviour
             aimLine.enabled = false;
         }
 
-        if (spriteLevel1 != null) spriteLevel1.SetActive(true);
-        if (spriteLevel2 != null) spriteLevel2.SetActive(false);
-        if (spriteLevel3 != null) spriteLevel3.SetActive(false);
+        if (spriteLevel1) spriteLevel1.SetActive(true);
+        if (spriteLevel2) spriteLevel2.SetActive(false);
+        if (spriteLevel3) spriteLevel3.SetActive(false);
     }
 
     void Update()
     {
         if (isMoving) return;
 
-        if (Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1))
-        {
-            dragStartScreen = Input.mousePosition;
-            isDragging = true;
-            isPrecisionShot = Input.GetMouseButton(1); // right-click
-            if (aimLine != null) aimLine.enabled = true;
-        }
-        else if ((Input.GetMouseButton(0) || Input.GetMouseButton(1)) && isDragging)
+        // Determine which shot mode is used
+        if (Input.GetMouseButtonDown(0)) StartDrag(powerShotMultiplier);
+        else if (Input.GetMouseButtonDown(1)) StartDrag(precisionShotMultiplier);
+        else if (Input.GetMouseButtonDown(2)) StartDrag(tapShotMultiplier);
+
+        else if ((Input.GetMouseButton(0) || Input.GetMouseButton(1) || Input.GetMouseButton(2)) && isDragging)
         {
             Vector2 dragDelta = (Vector2)Input.mousePosition - dragStartScreen;
             Vector3 pullDir = new Vector3(dragDelta.x, 0, dragDelta.y).normalized;
 
-            float dragMagnitude = Mathf.Pow(dragDelta.magnitude, 0.85f) * 0.01f;
-            float multiplier = isPrecisionShot ? precisionPowerMultiplier : 1f;
-            float pathLength = Mathf.Clamp(dragMagnitude * multiplier, 0f, pathMaxDistance);
+            float dragMagnitude = dragDelta.magnitude * baseDragScale * currentPowerMultiplier;
+            float pathLength = Mathf.Clamp(dragMagnitude, 0f, pathMaxDistance);
 
             bouncePath = GenerateBouncePath(transform.position, pullDir, pathLength);
 
             float powerPercent = Mathf.Clamp01(pathLength / pathMaxDistance);
-            Color currentColor = isPrecisionShot ? precisionColor : Color.Lerp(minPowerColor, maxPowerColor, powerPercent);
-
+            Color currentColor = Color.Lerp(minPowerColor, maxPowerColor, powerPercent);
             aimLine.startColor = currentColor;
             aimLine.endColor = currentColor;
 
-            DrawLine(bouncePath); // <--- draws the full line
+            DrawLine(bouncePath);
         }
-        else if ((Input.GetMouseButtonUp(0) || Input.GetMouseButtonUp(1)) && isDragging)
+        else if ((Input.GetMouseButtonUp(0) || Input.GetMouseButtonUp(1) || Input.GetMouseButtonUp(2)) && isDragging)
         {
             isDragging = false;
-            if (aimLine != null) aimLine.enabled = false;
+            aimLine.enabled = false;
 
             if (bouncePath.Count > 1)
             {
@@ -114,15 +112,22 @@ public class GolfBallController : MonoBehaviour
         }
     }
 
+    void StartDrag(float powerMultiplier)
+    {
+        dragStartScreen = Input.mousePosition;
+        currentPowerMultiplier = powerMultiplier;
+        isDragging = true;
+    }
+
     void UpdateShotSprites()
     {
-        if (spriteLevel1 != null) spriteLevel1.SetActive(false);
-        if (spriteLevel2 != null) spriteLevel2.SetActive(false);
-        if (spriteLevel3 != null) spriteLevel3.SetActive(false);
+        if (spriteLevel1) spriteLevel1.SetActive(false);
+        if (spriteLevel2) spriteLevel2.SetActive(false);
+        if (spriteLevel3) spriteLevel3.SetActive(false);
 
-        if (shotCount < 3 && spriteLevel1 != null) spriteLevel1.SetActive(true);
-        else if (shotCount < 5 && spriteLevel2 != null) spriteLevel2.SetActive(true);
-        else if (spriteLevel3 != null) spriteLevel3.SetActive(true);
+        if (shotCount < 3 && spriteLevel1) spriteLevel1.SetActive(true);
+        else if (shotCount < 5 && spriteLevel2) spriteLevel2.SetActive(true);
+        else if (spriteLevel3) spriteLevel3.SetActive(true);
     }
 
     List<Vector3> GenerateBouncePath(Vector3 startPos, Vector3 direction, float totalDistance)
@@ -130,24 +135,21 @@ public class GolfBallController : MonoBehaviour
         List<Vector3> points = new() { startPos };
         Vector3 currentPos = startPos;
         Vector3 currentDir = direction;
-        float remainingDistance = Mathf.Min(totalDistance, pathMaxDistance);
+        float remaining = Mathf.Min(totalDistance, pathMaxDistance);
 
-        for (int i = 0; i < maxBounces && remainingDistance > 0f; i++)
+        for (int i = 0; i < maxBounces && remaining > 0f; i++)
         {
-            if (Physics.Raycast(currentPos, currentDir, out RaycastHit hit, remainingDistance, collisionMask))
+            if (Physics.Raycast(currentPos, currentDir, out RaycastHit hit, remaining, collisionMask))
             {
                 points.Add(hit.point);
                 float traveled = Vector3.Distance(currentPos, hit.point);
-                remainingDistance -= traveled;
+                remaining -= traveled;
                 currentPos = hit.point;
                 currentDir = Vector3.Reflect(currentDir, hit.normal);
-
-                if (isMoving && audioSource && bounceSound && traveled > 0.5f)
-                    audioSource.PlayOneShot(bounceSound);
             }
             else
             {
-                points.Add(currentPos + currentDir * remainingDistance);
+                points.Add(currentPos + currentDir * remaining);
                 break;
             }
         }
@@ -155,30 +157,30 @@ public class GolfBallController : MonoBehaviour
         return points;
     }
 
-    void DrawLine(List<Vector3> fullPath)
+    void DrawLine(List<Vector3> path)
     {
-        if (aimLine == null || fullPath.Count < 2) return;
+        if (aimLine == null || path.Count < 2) return;
 
         float totalLength = 0f;
-        for (int i = 1; i < fullPath.Count; i++)
-            totalLength += Vector3.Distance(fullPath[i - 1], fullPath[i]);
+        for (int i = 1; i < path.Count; i++)
+            totalLength += Vector3.Distance(path[i - 1], path[i]);
 
         float visibleLength = totalLength * Mathf.Clamp01(aimLineVisiblePercent);
         float accumulated = 0f;
-        List<Vector3> visiblePoints = new() { fullPath[0] };
+        List<Vector3> visiblePoints = new() { path[0] };
 
-        for (int i = 1; i < fullPath.Count; i++)
+        for (int i = 1; i < path.Count; i++)
         {
-            float segment = Vector3.Distance(fullPath[i - 1], fullPath[i]);
+            float segment = Vector3.Distance(path[i - 1], path[i]);
             if (accumulated + segment > visibleLength)
             {
-                float remaining = visibleLength - accumulated;
-                Vector3 dir = (fullPath[i] - fullPath[i - 1]).normalized;
-                visiblePoints.Add(fullPath[i - 1] + dir * remaining);
+                float remain = visibleLength - accumulated;
+                Vector3 dir = (path[i] - path[i - 1]).normalized;
+                visiblePoints.Add(path[i - 1] + dir * remain);
                 break;
             }
 
-            visiblePoints.Add(fullPath[i]);
+            visiblePoints.Add(path[i]);
             accumulated += segment;
         }
 
@@ -196,20 +198,20 @@ public class GolfBallController : MonoBehaviour
         rb.isKinematic = true;
 
         Vector3 finalDir = Vector3.zero;
-        Vector3 lastDirection = Vector3.zero;
+        Vector3 lastDir = Vector3.zero;
 
         for (int i = 0; i < path.Count - 1; i++)
         {
             Vector3 start = path[i];
             Vector3 end = path[i + 1];
-            Vector3 direction = (end - start).normalized;
+            Vector3 dir = (end - start).normalized;
             float distance = Vector3.Distance(start, end);
             float duration = distance / speed;
 
-            if (i > 0 && Vector3.Angle(lastDirection, direction) > 10f && audioSource && bounceSound)
+            if (i > 0 && Vector3.Angle(lastDir, dir) > 10f && audioSource && bounceSound)
                 audioSource.PlayOneShot(bounceSound);
 
-            lastDirection = direction;
+            lastDir = dir;
 
             float t = 0f;
             while (t < 1f)
@@ -219,7 +221,7 @@ public class GolfBallController : MonoBehaviour
                 yield return null;
             }
 
-            finalDir = direction;
+            finalDir = dir;
         }
 
         rb.isKinematic = false;
@@ -242,12 +244,17 @@ public class GolfBallController : MonoBehaviour
             {
                 lowSpeedTime = 0f;
             }
+
             yield return null;
         }
 
         isMoving = false;
     }
 }
+
+
+
+
 
 
 
