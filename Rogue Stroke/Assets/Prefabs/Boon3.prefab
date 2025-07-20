@@ -202,7 +202,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 0c1778dd0c92be447beaeed208169529, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 521b29ab5f4e7e54a8615ef83afdeefd, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -225,6 +225,7 @@ GameObject:
   - component: {fileID: 4544380446154905555}
   - component: {fileID: 215944396920883689}
   - component: {fileID: 6130501689456056944}
+  - component: {fileID: 8860447584945326254}
   m_Layer: 5
   m_Name: Boon3
   m_TagString: Untagged
@@ -280,7 +281,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: ee8b2a938f253c34d910866e3d3649bc, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 521b29ab5f4e7e54a8615ef83afdeefd, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -322,3 +323,15 @@ MonoBehaviour:
   hoverScaleMultiplier: 1.1
   liftHeight: 10
   transitionSpeed: 5
+--- !u!114 &8860447584945326254
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6157819236443186896}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 23b70799a38194b4dba8707935ca48ce, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 

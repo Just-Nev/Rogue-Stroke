@@ -65,7 +65,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Aiming Line Is Now Reversed
+  m_text: Small Increase To Shot Line (5%)
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 5302535af1044152a457ed104f1f4b91, type: 2}
   m_sharedMaterial: {fileID: 2164040, guid: 5302535af1044152a457ed104f1f4b91, type: 2}
@@ -202,7 +202,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 521b29ab5f4e7e54a8615ef83afdeefd, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 5675bd118cdd3dd4cafcaaa435d828f8, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -225,9 +225,9 @@ GameObject:
   - component: {fileID: 4544380446154905555}
   - component: {fileID: 215944396920883689}
   - component: {fileID: 6130501689456056944}
-  - component: {fileID: -5990368003243437427}
+  - component: {fileID: -588871622206055937}
   m_Layer: 5
-  m_Name: Boon5
+  m_Name: Boon10
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -281,7 +281,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 521b29ab5f4e7e54a8615ef83afdeefd, type: 3}
+  m_Sprite: {fileID: 21300000, guid: ee8b2a938f253c34d910866e3d3649bc, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -303,7 +303,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6a1d66d9c1a4b294ebd3d16563f1d6d0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  cardID: 4
+  cardID: 9
   manager: {fileID: 0}
 --- !u!114 &6130501689456056944
 MonoBehaviour:
@@ -323,7 +323,7 @@ MonoBehaviour:
   hoverScaleMultiplier: 1.1
   liftHeight: 10
   transitionSpeed: 5
---- !u!114 &-5990368003243437427
+--- !u!114 &-588871622206055937
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
