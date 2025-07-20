@@ -10,6 +10,10 @@ public class GolfBallController : MonoBehaviour
     public float pathFollowSpeed = 1.5f;
     public float pathMaxDistance = 20f;
 
+    [Header("Precision Settings")]
+    public float precisionPowerMultiplier = 0.2f;
+    public Color precisionColor = Color.cyan;
+
     [Header("Aiming Line")]
     public LineRenderer aimLine;
     public float aimLineYOffset = 0.05f;
@@ -42,6 +46,7 @@ public class GolfBallController : MonoBehaviour
     private Vector2 dragStartScreen;
     private List<Vector3> bouncePath = new();
     private bool isMoving = false;
+    private bool isPrecisionShot = false;
 
     void Start()
     {
@@ -65,28 +70,33 @@ public class GolfBallController : MonoBehaviour
     {
         if (isMoving) return;
 
-        if (Input.GetMouseButtonDown(0))
+        if (Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1))
         {
             dragStartScreen = Input.mousePosition;
             isDragging = true;
+            isPrecisionShot = Input.GetMouseButton(1); // right-click
+            if (aimLine != null) aimLine.enabled = true;
         }
-        else if (Input.GetMouseButton(0) && isDragging)
+        else if ((Input.GetMouseButton(0) || Input.GetMouseButton(1)) && isDragging)
         {
             Vector2 dragDelta = (Vector2)Input.mousePosition - dragStartScreen;
             Vector3 pullDir = new Vector3(dragDelta.x, 0, dragDelta.y).normalized;
+
             float dragMagnitude = Mathf.Pow(dragDelta.magnitude, 0.85f) * 0.01f;
-            float pathLength = Mathf.Clamp(dragMagnitude, 0f, pathMaxDistance);
+            float multiplier = isPrecisionShot ? precisionPowerMultiplier : 1f;
+            float pathLength = Mathf.Clamp(dragMagnitude * multiplier, 0f, pathMaxDistance);
 
             bouncePath = GenerateBouncePath(transform.position, pullDir, pathLength);
 
             float powerPercent = Mathf.Clamp01(pathLength / pathMaxDistance);
-            Color currentColor = Color.Lerp(minPowerColor, maxPowerColor, powerPercent);
+            Color currentColor = isPrecisionShot ? precisionColor : Color.Lerp(minPowerColor, maxPowerColor, powerPercent);
+
             aimLine.startColor = currentColor;
             aimLine.endColor = currentColor;
 
-            DrawLine(bouncePath);
+            DrawLine(bouncePath); // <--- draws the full line
         }
-        else if (Input.GetMouseButtonUp(0) && isDragging)
+        else if ((Input.GetMouseButtonUp(0) || Input.GetMouseButtonUp(1)) && isDragging)
         {
             isDragging = false;
             if (aimLine != null) aimLine.enabled = false;
@@ -238,6 +248,8 @@ public class GolfBallController : MonoBehaviour
         isMoving = false;
     }
 }
+
+
 
 
 
