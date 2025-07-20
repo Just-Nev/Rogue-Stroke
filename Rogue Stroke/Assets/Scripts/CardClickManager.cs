@@ -22,6 +22,7 @@ public class CardClickManager : MonoBehaviour
 
     [Header("Scene Settings")]
     public float sceneChangeDelay = 1.5f;
+    public GameObject Fade;
 
     private bool cardAlreadyChosen = false;
 
@@ -183,8 +184,9 @@ public class CardClickManager : MonoBehaviour
 
     IEnumerator ClearActiveCardsAfterDelay(float delay)
     {
+        Fade.SetActive(true);
         yield return new WaitForSeconds(delay);
-
+        
         foreach (var card in activeCards)
         {
             if (card != null)
@@ -192,7 +194,10 @@ public class CardClickManager : MonoBehaviour
         }
 
         activeCards.Clear();
-
+        if (SceneManager.GetActiveScene().buildIndex == 3)
+        {
+            SceneManager.LoadScene(0); // Load Scene 1 when current scene is 3
+        }
         // Load next scene
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex + 1);
     }
@@ -203,10 +208,11 @@ public class CardClickManager : MonoBehaviour
         {
             if (card != null)
                 Destroy(card.gameObject);
-        }
-
+        }       
         activeCards.Clear();
     }
+
+
 }
 
 
