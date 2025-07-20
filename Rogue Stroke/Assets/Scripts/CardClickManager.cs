@@ -9,7 +9,7 @@ public class CardClickManager : MonoBehaviour
     public RectTransform[] allCardPrefabs;
     public RectTransform cardParent;
     public Vector2[] targetPositions;
-    public float scaleUpDuration = 0.6f; // Slower animation
+    public float scaleUpDuration = 0.6f;
 
     [Header("Runtime Data")]
     public List<RectTransform> activeCards = new List<RectTransform>();
@@ -33,22 +33,24 @@ public class CardClickManager : MonoBehaviour
         }
 
         List<int> indices = new List<int>();
-        for (int i = 0; i < allCardPrefabs.Length; i++) indices.Add(i);
+        for (int i = 0; i < allCardPrefabs.Length; i++)
+            indices.Add(i);
 
         for (int i = 0; i < 3; i++)
         {
             int rand = Random.Range(0, indices.Count);
-            RectTransform prefab = allCardPrefabs[indices[rand]];
+            int cardID = indices[rand]; //Correct ID
+            RectTransform prefab = allCardPrefabs[cardID];
             indices.RemoveAt(rand);
 
             RectTransform card = Instantiate(prefab, cardParent);
             card.anchoredPosition = targetPositions[i];
             card.localScale = Vector3.zero;
 
-            // Set up click info
+            // Set up click handler
             BoonCardClick clickScript = card.GetComponent<BoonCardClick>();
             if (clickScript == null) clickScript = card.gameObject.AddComponent<BoonCardClick>();
-            clickScript.cardID = rand;
+            clickScript.cardID = cardID;
             clickScript.manager = this;
 
             activeCards.Add(card);
@@ -63,33 +65,33 @@ public class CardClickManager : MonoBehaviour
 
         Debug.Log($"Card with ID {id} clicked!");
 
-        //Apply boon effect (your switch statement)
+        // Switch: Your card effect logic
         switch (id)
         {
             case 0:
-                Debug.Log("Speed Boost selected!");
+                Debug.Log("Shot Tax selected!");
                 break;
             case 1:
-                Debug.Log("Extra Shot selected!");
+                Debug.Log("1 Less Card selected!");
                 break;
             case 2:
-                Debug.Log("Teleport selected!");
+                Debug.Log("Countdown Clock selected!");
                 break;
             case 3:
-                Debug.Log("Batman");
+                Debug.Log("Fake Walls selected!");
                 break;
             case 4:
-                Debug.Log("Picard");
+                Debug.Log("Shot Reversal selected!");
                 break;
             case 5:
-                Debug.Log("Riker");
+                Debug.Log("More Bounces selected!");
                 break;
             default:
                 Debug.LogWarning("Unhandled card ID: " + id);
                 break;
         }
 
-        //Find the clicked card from the active list
+        // Find and animate selected card
         RectTransform selectedCard = null;
         foreach (var card in activeCards)
         {
@@ -107,17 +109,16 @@ public class CardClickManager : MonoBehaviour
             return;
         }
 
-        //Animate the selected card (shake, center, shrink)
         StartCoroutine(AnimateSelectedCard(selectedCard));
 
-        //Shrink other cards
+        // Shrink other cards
         foreach (var card in activeCards)
         {
             if (card != selectedCard)
                 StartCoroutine(ShrinkAndDisable(card));
         }
 
-        //Optional cleanup
+        // Clear after delay
         StartCoroutine(ClearActiveCardsAfterDelay(1f));
     }
 
@@ -135,8 +136,6 @@ public class CardClickManager : MonoBehaviour
         }
 
         card.anchoredPosition = originalPos;
-
-        // Shrink the selected card after shake
         yield return StartCoroutine(ShrinkAndDisable(card));
     }
 
@@ -164,7 +163,6 @@ public class CardClickManager : MonoBehaviour
         activeCards.Clear();
     }
 
-
     IEnumerator ScaleCardUp(RectTransform card)
     {
         float t = 0f;
@@ -180,25 +178,15 @@ public class CardClickManager : MonoBehaviour
         card.localScale = targetScale;
     }
 
-    IEnumerator HideAllCards()
-    {
-        yield return new WaitForSeconds(0.5f); // Optional delay before disappearing
-
-        foreach (var card in activeCards)
-        {
-            Destroy(card.gameObject);
-        }
-
-        activeCards.Clear();
-    }
-
     public void ClearCards()
     {
         foreach (var card in activeCards)
         {
-            if (card != null) Destroy(card.gameObject);
+            if (card != null)
+                Destroy(card.gameObject);
         }
         activeCards.Clear();
     }
 }
+
 

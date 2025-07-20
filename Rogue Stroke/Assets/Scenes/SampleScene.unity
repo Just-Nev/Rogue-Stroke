@@ -1136,7 +1136,9 @@ MonoBehaviour:
   - {fileID: 2548373306036126414, guid: 1f56e16e3173bfc4497fb3dd3433d225, type: 3}
   - {fileID: 5481930048059386985, guid: c114d8400720bb2469d92149f1b5fea2, type: 3}
   - {fileID: 6330927492707087453, guid: a31b1e4f3b6bb044cbe05ca2d0ba4b70, type: 3}
-  - {fileID: 2548373306036126414, guid: 1f56e16e3173bfc4497fb3dd3433d225, type: 3}
+  - {fileID: 6330927492707087453, guid: ccc9a250451cc55468671bf0c15792de, type: 3}
+  - {fileID: 6330927492707087453, guid: d46a3a6ef46e25d4e9b65bb265ee909a, type: 3}
+  - {fileID: 6330927492707087453, guid: c69b7f0600f1fa045a9ee49ebcb558a2, type: 3}
   cardParent: {fileID: 1505618462}
   targetPositions:
   - {x: -500, y: -12}
@@ -1144,9 +1146,9 @@ MonoBehaviour:
   - {x: 500, y: -12}
   scaleUpDuration: 0.6
   activeCards: []
-  shakeDuration: 2
-  shakeSpeed: 40
-  shakeAmount: 15
+  shakeDuration: 1
+  shakeSpeed: 25
+  shakeAmount: 20
 --- !u!4 &342871046
 Transform:
   m_ObjectHideFlags: 0
