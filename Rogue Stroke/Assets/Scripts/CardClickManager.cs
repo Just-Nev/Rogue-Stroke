@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 
 public class CardClickManager : MonoBehaviour
 {
@@ -11,12 +12,17 @@ public class CardClickManager : MonoBehaviour
     public Vector2[] targetPositions;
     public float scaleUpDuration = 0.6f;
 
+    [Header("Runtime Data")]
+    public List<RectTransform> activeCards = new List<RectTransform>();
+
     [Header("Shake Settings")]
     public float shakeDuration = 0.3f;
     public float shakeSpeed = 40f;
     public float shakeAmount = 10f;
 
-    public List<RectTransform> activeCards = new List<RectTransform>();
+    [Header("Scene Settings")]
+    public float sceneChangeDelay = 1.5f;
+
     private bool cardAlreadyChosen = false;
 
     public void ShowRandomCards()
@@ -24,64 +30,34 @@ public class CardClickManager : MonoBehaviour
         ClearCards();
         cardAlreadyChosen = false;
 
-        // Categorize cards by rarity
-        List<RectTransform> commons = new();
-        List<RectTransform> rares = new();
-        List<RectTransform> epics = new();
-
-        foreach (var prefab in allCardPrefabs)
+        if (allCardPrefabs.Length < 3)
         {
-            CardData data = prefab.GetComponent<CardData>();
-            if (data == null) continue;
-
-            switch (data.rarity)
-            {
-                case CardRarity.Common: commons.Add(prefab); break;
-                case CardRarity.Rare: rares.Add(prefab); break;
-                case CardRarity.Epic: epics.Add(prefab); break;
-            }
+            Debug.LogWarning("Not enough card prefabs.");
+            return;
         }
+
+        List<int> indices = new List<int>();
+        for (int i = 0; i < allCardPrefabs.Length; i++) indices.Add(i);
 
         for (int i = 0; i < 3; i++)
         {
-            RectTransform chosen = GetRandomCardWithRarity(commons, rares, epics);
-            if (chosen == null) continue;
+            int rand = Random.Range(0, indices.Count);
+            RectTransform prefab = allCardPrefabs[indices[rand]];
+            int cardID = indices[rand];
+            indices.RemoveAt(rand);
 
-            RectTransform card = Instantiate(chosen, cardParent);
+            RectTransform card = Instantiate(prefab, cardParent);
             card.anchoredPosition = targetPositions[i];
             card.localScale = Vector3.zero;
 
             BoonCardClick clickScript = card.GetComponent<BoonCardClick>();
-            CardData data = chosen.GetComponent<CardData>();
-
             if (clickScript == null) clickScript = card.gameObject.AddComponent<BoonCardClick>();
-            clickScript.cardID = data.cardID;
+            clickScript.cardID = cardID;
             clickScript.manager = this;
 
             activeCards.Add(card);
             StartCoroutine(ScaleCardUp(card));
         }
-    }
-
-    RectTransform GetRandomCardWithRarity(
-        List<RectTransform> commons,
-        List<RectTransform> rares,
-        List<RectTransform> epics)
-    {
-        float roll = Random.value;
-
-        if (roll < 0.6f && commons.Count > 0)
-            return commons[Random.Range(0, commons.Count)];
-        if (roll < 0.9f && rares.Count > 0)
-            return rares[Random.Range(0, rares.Count)];
-        if (epics.Count > 0)
-            return epics[Random.Range(0, epics.Count)];
-
-        // fallback if nothing matches
-        if (commons.Count > 0) return commons[Random.Range(0, commons.Count)];
-        if (rares.Count > 0) return rares[Random.Range(0, rares.Count)];
-
-        return null;
     }
 
     public void OnCardClicked(int id)
@@ -91,7 +67,7 @@ public class CardClickManager : MonoBehaviour
 
         Debug.Log($"Card with ID {id} clicked!");
 
-        //Save to run data
+        // Save selected card to RunData
         if (RunData.Instance != null)
         {
             RunData.Instance.selectedCardIDs.Add(id);
@@ -122,6 +98,8 @@ public class CardClickManager : MonoBehaviour
             default: Debug.Log("Unhandled ID"); break;
         }
 
+
+        // Find selected card
         RectTransform selectedCard = null;
         foreach (var card in activeCards)
         {
@@ -135,19 +113,22 @@ public class CardClickManager : MonoBehaviour
 
         if (selectedCard == null)
         {
-            Debug.LogError("Selected card not found.");
+            Debug.LogError("Selected card not found in activeCards.");
             return;
         }
 
+        // Animate selected card
         StartCoroutine(AnimateSelectedCard(selectedCard));
 
+        // Shrink the other two
         foreach (var card in activeCards)
         {
             if (card != selectedCard)
                 StartCoroutine(ShrinkAndDisable(card));
         }
 
-        StartCoroutine(ClearActiveCardsAfterDelay(1f));
+        // Cleanup + transition
+        StartCoroutine(ClearActiveCardsAfterDelay(sceneChangeDelay));
     }
 
     IEnumerator AnimateSelectedCard(RectTransform card)
@@ -203,18 +184,31 @@ public class CardClickManager : MonoBehaviour
     IEnumerator ClearActiveCardsAfterDelay(float delay)
     {
         yield return new WaitForSeconds(delay);
+
+        foreach (var card in activeCards)
+        {
+            if (card != null)
+                Destroy(card.gameObject);
+        }
+
         activeCards.Clear();
+
+        // Load next scene
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex + 1);
     }
 
     public void ClearCards()
     {
         foreach (var card in activeCards)
         {
-            if (card != null) Destroy(card.gameObject);
+            if (card != null)
+                Destroy(card.gameObject);
         }
+
         activeCards.Clear();
     }
 }
+
 
 
 
