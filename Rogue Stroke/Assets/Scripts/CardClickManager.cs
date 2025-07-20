@@ -11,14 +11,12 @@ public class CardClickManager : MonoBehaviour
     public Vector2[] targetPositions;
     public float scaleUpDuration = 0.6f;
 
-    [Header("Runtime Data")]
-    public List<RectTransform> activeCards = new List<RectTransform>();
-
     [Header("Shake Settings")]
     public float shakeDuration = 0.3f;
     public float shakeSpeed = 40f;
     public float shakeAmount = 10f;
 
+    public List<RectTransform> activeCards = new List<RectTransform>();
     private bool cardAlreadyChosen = false;
 
     public void ShowRandomCards()
@@ -26,36 +24,64 @@ public class CardClickManager : MonoBehaviour
         ClearCards();
         cardAlreadyChosen = false;
 
-        if (allCardPrefabs.Length < 3)
-        {
-            Debug.LogWarning("Not enough card prefabs.");
-            return;
-        }
+        // Categorize cards by rarity
+        List<RectTransform> commons = new();
+        List<RectTransform> rares = new();
+        List<RectTransform> epics = new();
 
-        List<int> indices = new List<int>();
-        for (int i = 0; i < allCardPrefabs.Length; i++)
-            indices.Add(i);
+        foreach (var prefab in allCardPrefabs)
+        {
+            CardData data = prefab.GetComponent<CardData>();
+            if (data == null) continue;
+
+            switch (data.rarity)
+            {
+                case CardRarity.Common: commons.Add(prefab); break;
+                case CardRarity.Rare: rares.Add(prefab); break;
+                case CardRarity.Epic: epics.Add(prefab); break;
+            }
+        }
 
         for (int i = 0; i < 3; i++)
         {
-            int rand = Random.Range(0, indices.Count);
-            int cardID = indices[rand]; //Correct ID
-            RectTransform prefab = allCardPrefabs[cardID];
-            indices.RemoveAt(rand);
+            RectTransform chosen = GetRandomCardWithRarity(commons, rares, epics);
+            if (chosen == null) continue;
 
-            RectTransform card = Instantiate(prefab, cardParent);
+            RectTransform card = Instantiate(chosen, cardParent);
             card.anchoredPosition = targetPositions[i];
             card.localScale = Vector3.zero;
 
-            // Set up click handler
             BoonCardClick clickScript = card.GetComponent<BoonCardClick>();
+            CardData data = chosen.GetComponent<CardData>();
+
             if (clickScript == null) clickScript = card.gameObject.AddComponent<BoonCardClick>();
-            clickScript.cardID = cardID;
+            clickScript.cardID = data.cardID;
             clickScript.manager = this;
 
             activeCards.Add(card);
             StartCoroutine(ScaleCardUp(card));
         }
+    }
+
+    RectTransform GetRandomCardWithRarity(
+        List<RectTransform> commons,
+        List<RectTransform> rares,
+        List<RectTransform> epics)
+    {
+        float roll = Random.value;
+
+        if (roll < 0.6f && commons.Count > 0)
+            return commons[Random.Range(0, commons.Count)];
+        if (roll < 0.9f && rares.Count > 0)
+            return rares[Random.Range(0, rares.Count)];
+        if (epics.Count > 0)
+            return epics[Random.Range(0, epics.Count)];
+
+        // fallback if nothing matches
+        if (commons.Count > 0) return commons[Random.Range(0, commons.Count)];
+        if (rares.Count > 0) return rares[Random.Range(0, rares.Count)];
+
+        return null;
     }
 
     public void OnCardClicked(int id)
@@ -65,33 +91,30 @@ public class CardClickManager : MonoBehaviour
 
         Debug.Log($"Card with ID {id} clicked!");
 
-        // Switch: Your card effect logic
+        // Apply effect based on ID
         switch (id)
         {
-            case 0:
-                Debug.Log("Shot Tax selected!");
-                break;
-            case 1:
-                Debug.Log("1 Less Card selected!");
-                break;
-            case 2:
-                Debug.Log("Countdown Clock selected!");
-                break;
-            case 3:
-                Debug.Log("Fake Walls selected!");
-                break;
-            case 4:
-                Debug.Log("Shot Reversal selected!");
-                break;
-            case 5:
-                Debug.Log("More Bounces selected!");
-                break;
-            default:
-                Debug.LogWarning("Unhandled card ID: " + id);
-                break;
+            case 0: Debug.Log("Shot Tax"); break;
+            case 1: Debug.Log("1 Less Card"); break;
+            case 2: Debug.Log("Countdown Clock"); break;
+            case 3: Debug.Log("Fake Walls"); break;
+            case 4: Debug.Log("Shot Reversal"); break;
+            case 5: Debug.Log("More Bounces"); break;
+            case 6: Debug.Log("Re Roll Cards"); break;
+            case 7: Debug.Log("Can Nudge The Ball After It Stops"); break;
+            case 8: Debug.Log("Magnetic Pocket"); break;
+            case 9: Debug.Log("5% Longer Shot Line"); break;
+            case 10: Debug.Log("10% More Money"); break;
+            case 11: Debug.Log("10% Shot Speed Increase"); break;
+            case 12: Debug.Log("Patience Metre Increase"); break;
+            case 13: Debug.Log("10% Longer Shot Line"); break;
+            case 14: Debug.Log("Rewind"); break;
+            case 15: Debug.Log("Portal Creator"); break;
+            case 16: Debug.Log("Second Life"); break;
+            case 17: Debug.Log("Handbreak"); break;
+            default: Debug.Log("Unhandled ID"); break;
         }
 
-        // Find and animate selected card
         RectTransform selectedCard = null;
         foreach (var card in activeCards)
         {
@@ -105,20 +128,18 @@ public class CardClickManager : MonoBehaviour
 
         if (selectedCard == null)
         {
-            Debug.LogError("Selected card not found in activeCards.");
+            Debug.LogError("Selected card not found.");
             return;
         }
 
         StartCoroutine(AnimateSelectedCard(selectedCard));
 
-        // Shrink other cards
         foreach (var card in activeCards)
         {
             if (card != selectedCard)
                 StartCoroutine(ShrinkAndDisable(card));
         }
 
-        // Clear after delay
         StartCoroutine(ClearActiveCardsAfterDelay(1f));
     }
 
@@ -157,12 +178,6 @@ public class CardClickManager : MonoBehaviour
         card.gameObject.SetActive(false);
     }
 
-    IEnumerator ClearActiveCardsAfterDelay(float delay)
-    {
-        yield return new WaitForSeconds(delay);
-        activeCards.Clear();
-    }
-
     IEnumerator ScaleCardUp(RectTransform card)
     {
         float t = 0f;
@@ -178,15 +193,21 @@ public class CardClickManager : MonoBehaviour
         card.localScale = targetScale;
     }
 
+    IEnumerator ClearActiveCardsAfterDelay(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        activeCards.Clear();
+    }
+
     public void ClearCards()
     {
         foreach (var card in activeCards)
         {
-            if (card != null)
-                Destroy(card.gameObject);
+            if (card != null) Destroy(card.gameObject);
         }
         activeCards.Clear();
     }
 }
+
 
 

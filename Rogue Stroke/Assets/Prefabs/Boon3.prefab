@@ -335,3 +335,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 23b70799a38194b4dba8707935ca48ce, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  cardID: 2
+  rarity: 1

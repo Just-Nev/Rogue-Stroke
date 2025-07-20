@@ -1,16 +1,9 @@
 using UnityEngine;
 
+public enum CardRarity { Common, Rare, Epic }
+
 public class CardData : MonoBehaviour
 {
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
-    {
-        
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        
-    }
+    public int cardID;
+    public CardRarity rarity;
 }
