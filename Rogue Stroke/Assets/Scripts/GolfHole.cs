@@ -2,7 +2,6 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.EventSystems;
 
 public class GolfHole : MonoBehaviour
 {
@@ -12,10 +11,10 @@ public class GolfHole : MonoBehaviour
     public float scaleFactor = 0.6f;
 
     [Header("Tag Settings")]
-    public string ballTag = "Player"; // or "Ball"
+    public string ballTag = "Player";
 
     [Header("UI Display")]
-    public RectTransform[] imagePool; // Drag disabled images into this
+    public RectTransform[] imagePool; // assign all cards in Inspector
     public Vector2[] targetPositions = new Vector2[3]
     {
         new Vector2(-32f, -12f),
@@ -23,8 +22,8 @@ public class GolfHole : MonoBehaviour
         new Vector2(417f, -12f)
     };
 
-    private RectTransform[] activeImages = new RectTransform[3];
-    private bool[] boons = new bool[3];
+    private List<RectTransform> activeImages = new List<RectTransform>();
+    private HashSet<int> usedCardIDs = new HashSet<int>();
 
     private void OnTriggerEnter(Collider other)
     {
@@ -58,68 +57,145 @@ public class GolfHole : MonoBehaviour
         }
 
         ball.gameObject.SetActive(false);
-        ShowRandomImages();
+        ShowRandomCards();
     }
 
-    private void ShowRandomImages()
+    private void ShowRandomCards()
     {
+        activeImages.Clear();
+
         if (imagePool.Length < 3)
         {
-            Debug.LogWarning("Not enough images in the array!");
+            Debug.LogWarning("Not enough cards assigned to imagePool!");
             return;
         }
 
-        // Build list of available indices to prevent duplicates
         List<int> availableIndices = new List<int>();
         for (int i = 0; i < imagePool.Length; i++)
-            availableIndices.Add(i);
+        {
+            if (!usedCardIDs.Contains(i))
+                availableIndices.Add(i);
+        }
+
+        if (availableIndices.Count < 3)
+        {
+            Debug.LogWarning("Not enough unused cards left to show 3!");
+            return;
+        }
 
         for (int i = 0; i < 3; i++)
         {
             int randomIndex = Random.Range(0, availableIndices.Count);
-            RectTransform chosenImage = imagePool[availableIndices[randomIndex]];
+            int chosenIndex = availableIndices[randomIndex];
             availableIndices.RemoveAt(randomIndex);
 
-            chosenImage.gameObject.SetActive(true);
-            chosenImage.anchoredPosition = targetPositions[i];
-            chosenImage.localScale = Vector3.zero;
-            StartCoroutine(ScaleIn(chosenImage));
+            RectTransform card = imagePool[chosenIndex];
+            card.gameObject.SetActive(true);
+            card.anchoredPosition = targetPositions[i];
+            card.localScale = Vector3.zero;
 
-            BoonCardClick clickScript = chosenImage.GetComponent<BoonCardClick>();
+            BoonCardClick clickScript = card.GetComponent<BoonCardClick>();
             if (clickScript == null)
-                clickScript = chosenImage.gameObject.AddComponent<BoonCardClick>();
+                clickScript = card.gameObject.AddComponent<BoonCardClick>();
 
-            clickScript.cardIndex = i;
-            clickScript.holeReference = this;
+            clickScript.cardID = chosenIndex;
+            clickScript.hole = this;
 
-            activeImages[i] = chosenImage;
-            boons[i] = false;
+            activeImages.Add(card);
+            StartCoroutine(ScaleInCard(card));
         }
     }
 
-    public void OnCardClicked(int index)
-    {
-        if (index >= 0 && index < boons.Length)
-        {
-            boons[index] = true;
-            Debug.Log($"Card {index + 1} clicked. boons[{index}] = true");
-        }
-    }
-
-    private IEnumerator ScaleIn(Transform image)
+    private IEnumerator ScaleInCard(RectTransform card)
     {
         float duration = 0.3f;
         float elapsed = 0f;
+        Vector3 startScale = Vector3.zero;
+        Vector3 targetScale = Vector3.one;
+
         while (elapsed < duration)
         {
+            elapsed += Time.deltaTime;
             float t = elapsed / duration;
-            image.localScale = Vector3.Lerp(Vector3.zero, Vector3.one, t);
+            card.localScale = Vector3.Lerp(startScale, targetScale, t);
+            yield return null;
+        }
+
+        card.localScale = targetScale;
+    }
+
+    public void HideAllCardsAndMarkUsed(int clickedID)
+    {
+        Debug.Log("Card with ID " + clickedID + " clicked!");
+        usedCardIDs.Add(clickedID);
+
+        StartCoroutine(SmoothHideCards(clickedID));
+    }
+
+    private IEnumerator SmoothHideCards(int clickedID)
+    {
+        float shakeDuration = 0.3f;
+        float shrinkDuration = 0.25f;
+
+        // Step 1: Shake selected card
+        RectTransform clickedCard = activeImages[clickedID];
+        yield return StartCoroutine(ShakeCard(clickedCard, shakeDuration, 10f));
+
+        // Step 2: Shrink all cards
+        List<Coroutine> shrinkCoroutines = new List<Coroutine>();
+        foreach (var card in activeImages)
+        {
+            shrinkCoroutines.Add(StartCoroutine(ShrinkCard(card, shrinkDuration)));
+        }
+
+        foreach (var c in shrinkCoroutines)
+            yield return c;
+
+        // Step 3: Deactivate all
+        foreach (var card in activeImages)
+            if (card != null)
+                card.gameObject.SetActive(false);
+
+        activeImages.Clear();
+    }
+
+    private IEnumerator ShrinkCard(RectTransform card, float duration)
+    {
+        Vector3 start = card.localScale;
+        Vector3 end = Vector3.zero;
+
+        float t = 0f;
+        while (t < 1f)
+        {
+            t += Time.deltaTime / duration;
+            card.localScale = Vector3.Lerp(start, end, t);
+            yield return null;
+        }
+
+        card.localScale = end;
+    }
+
+    private IEnumerator ShakeCard(RectTransform card, float duration, float magnitude)
+    {
+        Vector3 originalPos = card.anchoredPosition;
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            float offsetX = Random.Range(-1f, 1f) * magnitude;
+            float offsetY = Random.Range(-1f, 1f) * magnitude;
+
+            card.anchoredPosition = originalPos + new Vector3(offsetX, offsetY);
             elapsed += Time.deltaTime;
             yield return null;
         }
-        image.localScale = Vector3.one;
+
+        card.anchoredPosition = originalPos;
     }
 }
+
+
+
 
 
 

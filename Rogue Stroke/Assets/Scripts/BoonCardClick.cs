@@ -1,16 +1,16 @@
-using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine;
 
 public class BoonCardClick : MonoBehaviour, IPointerClickHandler
 {
-    public int cardIndex; // Set this 0–2 when assigning the card
-    public GolfHole holeReference;
+    public int cardID;
+    public GolfHole hole;
 
     public void OnPointerClick(PointerEventData eventData)
     {
-        if (holeReference != null)
+        if (hole != null)
         {
-            holeReference.OnCardClicked(cardIndex);
+            hole.HideAllCardsAndMarkUsed(cardID);
         }
     }
 }
